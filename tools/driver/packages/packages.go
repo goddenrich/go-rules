@@ -214,7 +214,8 @@ func loadPackageInfo(files []string, mode packages.LoadMode) ([]*packages.Packag
 		return nil, err
 	}
 	// N.B. deliberate not to close these here, they happen exactly when needed.
-	whatinputs := plz(append([]string{"query", "whatinputs", "--ignore_unknown" }, files...)...)
+	whatinputs := plz("query", "whatinputs", "--ignore_unknown", "-")
+	whatinputs.Stdin = strings.NewReader(strings.Join(files, "\n"))
 	whatinputs.Stdout = w1
 	args := []string{"query", "deps", "-", "--hidden", "-i", "go_pkg_info", "-i", "go_src"}
 	if (mode & packages.NeedExportFile) != 0 {
@@ -342,7 +343,11 @@ func directoriesToFiles(in []string, includeTests bool) ([]string, error) {
 			if err := filepath.WalkDir(strings.TrimSuffix(x, "/..."), func(path string, d fs.DirEntry, err error) error {
 				if err != nil {
 					return err
-				} else if strings.HasSuffix(path, ".go") && (d.Type()&fs.ModeSymlink) == 0 {
+				}
+				if d.Name() =="plz-out" {
+					return filepath.SkipDir
+				}
+				if strings.HasSuffix(path, ".go") && (d.Type()&fs.ModeSymlink) == 0 {
 					files = append(files, path)
 				}
 				return nil
