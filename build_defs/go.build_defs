@@ -1621,9 +1621,10 @@ def _go_pkg_info(name:str, srcs:list, visibility:list, importconfig:str=None, im
     install_flags = ""
     for i in install:
         install_flags += f" -p {i}" if i else " -p ."
+    target = canonicalise(":" + name)
 
     if module and not subrepo:
-        cmd = f'$TOOL m -m {module} {install_flags}'
+        cmd = f'$TOOL m -m {module} -t {target} {install_flags}'
     else:
         # The import path `go tool compile` expects for a binary target (i.e. `-p main`) doesn't match what we expect in
         # the driver response i.e. the package dir. We also don't want to set the package name, as that is something
@@ -1633,7 +1634,7 @@ def _go_pkg_info(name:str, srcs:list, visibility:list, importconfig:str=None, im
             import_path =  _get_import_path("", "")
         else:
             import_path = _get_import_path(package, import_path)
-        cmd = f'$TOOL p -i "{import_path}" -m "{import_path}:$PKG_DIR/{package}.a"'
+        cmd = f'$TOOL p -i "{import_path}" -t "{target}" -m "{import_path}:$PKG_DIR/{package}.a"'
         if subrepo:
             cmd = f"{cmd} -s {subrepo}"
         if module:
