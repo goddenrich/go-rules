@@ -194,6 +194,9 @@ func packagesToResponse(rootpath string, pkgs []*packages.Package, dirs map[stri
 // A cooler way of handling this in future would be to do this in-process; for that we'd
 // need to define the SDK we keep talking about as a supported programmatic interface.
 func loadPackageInfo(files []string, mode packages.LoadMode) ([]*packages.Package, error) {
+	if len(files) == 0 {
+		return []*packages.Package{}, nil
+	}
 	isTerminal := term.IsTerminal(int(os.Stderr.Fd()))
 	plz := func(args ...string) *exec.Cmd {
 		cmd := exec.Command("plz", args...)
@@ -214,7 +217,8 @@ func loadPackageInfo(files []string, mode packages.LoadMode) ([]*packages.Packag
 		return nil, err
 	}
 	// N.B. deliberate not to close these here, they happen exactly when needed.
-	whatinputs := plz(append([]string{"query", "whatinputs", "--ignore_unknown" }, files...)...)
+	whatinputs := plz("query", "whatinputs", "--ignore_unknown", "--hidden", "-")
+	whatinputs.Stdin = strings.NewReader(strings.Join(files, "\n"))
 	whatinputs.Stdout = w1
 	args := []string{"query", "deps", "-", "--hidden", "-i", "go_pkg_info", "-i", "go_src"}
 	if (mode & packages.NeedExportFile) != 0 {
