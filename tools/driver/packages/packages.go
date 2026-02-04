@@ -342,7 +342,11 @@ func directoriesToFiles(in []string, includeTests bool) ([]string, error) {
 			if err := filepath.WalkDir(strings.TrimSuffix(x, "/..."), func(path string, d fs.DirEntry, err error) error {
 				if err != nil {
 					return err
-				} else if strings.HasSuffix(path, ".go") && (d.Type()&fs.ModeSymlink) == 0 {
+				}
+				if d.Name() == "plz-out" {
+					return filepath.SkipDir
+				}
+				if strings.HasSuffix(path, ".go") && (d.Type()&fs.ModeSymlink) == 0 {
 					files = append(files, path)
 				}
 				return nil
