@@ -190,22 +190,22 @@ func packagesToResponse(rootpath string, pkgs []*packages.Package, dirs map[stri
 	}, nil
 }
 
+func plz(args ...string) *exec.Cmd {
+	cmd := exec.Command("plz", args...)
+	if term.IsTerminal(int(os.Stderr.Fd())) {
+		cmd.Stderr = &bytes.Buffer{}
+	} else {
+		cmd.Stderr = os.Stderr
+	}
+	return cmd
+}
+
 // loadPackageInfo loads all the package information by executing Please.
 // A cooler way of handling this in future would be to do this in-process; for that we'd
 // need to define the SDK we keep talking about as a supported programmatic interface.
 func loadPackageInfo(files []string, mode packages.LoadMode) ([]*packages.Package, error) {
 	if len(files) == 0 {
 		return []*packages.Package{}, nil
-	}
-	isTerminal := term.IsTerminal(int(os.Stderr.Fd()))
-	plz := func(args ...string) *exec.Cmd {
-		cmd := exec.Command("plz", args...)
-		if !isTerminal {
-			cmd.Stderr = &bytes.Buffer{}
-		} else {
-			cmd.Stderr = os.Stderr
-		}
-		return cmd
 	}
 
 	r1, w1, err := os.Pipe()
@@ -339,6 +339,12 @@ func handleSubprocessErr(cmd *exec.Cmd, err error) error {
 // directoriesToFiles expands any directories in the given list to files in that directory.
 func directoriesToFiles(in []string, includeTests bool) ([]string, error) {
 	files := make([]string, 0, len(in))
+	experimentalCmd := plz("query", "config", "parse.ExperimentalDir")
+	experimentalDir, err := experimentalCmd.Output()
+	if err != nil {
+		return nil, handleSubprocessErr(experimentalCmd, err)
+	}
+
 	for _, x := range in {
 		if strings.HasSuffix(x, "/...") {
 			// We could turn this into a `/...` style thing for plz but we also need to know the
@@ -347,7 +353,7 @@ func directoriesToFiles(in []string, includeTests bool) ([]string, error) {
 				if err != nil {
 					return err
 				}
-				if d.Name() == "plz-out" {
+				if d.Name() == "plz-out" || d.Name() == strings.TrimSpace(string(experimentalDir)) {
 					return filepath.SkipDir
 				}
 				if strings.HasSuffix(path, ".go") && (d.Type()&fs.ModeSymlink) == 0 {
