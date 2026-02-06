@@ -157,16 +157,17 @@ func packagesToResponse(rootpath string, pkgs []*packages.Package, dirs map[stri
 		for i, file := range pkg.GoFiles {
 			// This is pretty awkward; we need to try to figure out where these files exist now,
 			// which isn't particularly clear to the build actions that generated them.
-			if pathExists(file) {
-				pkg.GoFiles[i] = filepath.Join(rootpath, file)
-			} else if path := filepath.Join(rootpath, "plz-out/subrepos", file); pathExists(path) {
-				pkg.GoFiles[i] = path
-			} else if path := filepath.Join(rootpath, "plz-out/gen", file); pathExists(path) {
-				pkg.GoFiles[i] = path
-			}
+			pkg.GoFiles[i] = findFile(rootpath, file)
 		}
 		pkg.CompiledGoFiles = pkg.GoFiles
 		pkg.ExportFile = filepath.Join(rootpath, pkg.ExportFile)
+		for i, file := range pkg.EmbedFiles {
+			pkg.EmbedFiles[i] = findFile(rootpath, file)
+		}
+		for i, pattern := range pkg.EmbedPatterns {
+			pkg.EmbedPatterns[i] = findFilePattern(rootpath, pattern)
+		}
+
 	}
 	if !seenRuntime {
 		// Handle stdlib imports if we didn't already find them
@@ -198,6 +199,28 @@ func plz(args ...string) *exec.Cmd {
 		cmd.Stderr = os.Stderr
 	}
 	return cmd
+}
+
+func findFile(rootpath, file string) string {
+	if pathExists(file) {
+		return filepath.Join(rootpath, file)
+	} else if path := filepath.Join(rootpath, "plz-out/subrepos", file); pathExists(path) {
+		return path
+	} else if path := filepath.Join(rootpath, "plz-out/gen", file); pathExists(path) {
+		return path
+	}
+	return filepath.Join(rootpath, file)
+}
+
+func findFilePattern(rootpath, pattern string) string {
+	if matches, err := filepath.Glob(filepath.Join(rootpath, pattern)); err != nil && len(matches) > 0 {
+		return filepath.Join(rootpath, pattern)
+	} else if matches, err := filepath.Glob(filepath.Join(rootpath, "plz-out/subrepos", pattern)); err != nil && len(matches) > 0 {
+		return filepath.Join(rootpath, "plz-out/subrepos", pattern)
+	} else if matches, err := filepath.Glob(filepath.Join(rootpath, "plz-out/gen", pattern)); err != nil && len(matches) > 0 {
+		return filepath.Join(rootpath, "plz-out/gen", pattern)
+	}
+	return filepath.Join(rootpath, pattern)
 }
 
 // loadPackageInfo loads all the package information by executing Please.
